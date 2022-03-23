@@ -87,7 +87,6 @@ type Device struct {
 	Capabilities  map[int]map[int]string
 	Absinfos      map[int]AbsInfo
 	eventchan     chan []*Event
-	pipe          unsafe.Pointer
 }
 
 func (e *Device) String() string {
