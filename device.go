@@ -3,7 +3,6 @@ package inputeventsubsystem
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"os"
 	"syscall"
@@ -149,7 +148,7 @@ func Open(devnode string) (*Device, error) {
 
 	if errevbits := C.geteviocbits(C.int(dev.fd), 0, EV_MAX, unsafe.Pointer(evbits)); errevbits < 0 {
 		defer syscall.Close(dev.fd)
-		return nil, errors.New("unable to get evbits")
+		return nil, ErrEvBits
 	}
 
 	dev.Capabilities = make(map[int]map[int]string)
