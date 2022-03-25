@@ -6,51 +6,7 @@ import (
 	"fmt"
 	"os"
 	"syscall"
-	"unsafe"
-
-	"golang.org/x/sys/unix"
 )
-
-/*
-
-#include <linux/input.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <string.h>
-#include <pthread.h>
-#include <sched.h>
-
-static inline int getdevicename(int fd,int size,char *name_dst)
-{
-return ioctl(fd, EVIOCGNAME(size), name_dst);
-}
-
-static inline int getphy(int fd,int size,char *phy_dst)
-{
-return ioctl(fd, EVIOCGPHYS(size), phy_dst);
-}
-
-static inline int geteviocbits(int fd,int min,int max,void *evbits)
-{
-return ioctl(fd,EVIOCGBIT(min, max),evbits);
-}
-
-static inline int geteviocgkey(int fd,int size,void *keybits)
-{
-return ioctl(fd,EVIOCGKEY(size),keybits);
-}
-
-static inline int geteviocgabs(int fd,int type,void *absbits)
-{
-return ioctl(fd,EVIOCGABS(type),absbits);
-}
-
-
-*/
-import "C"
 
 type AbsInfo struct {
 	Value      int32
@@ -88,6 +44,7 @@ type Device struct {
 	Capabilities  map[int]map[int]string
 	Absinfos      map[int]AbsInfo
 	eventchan     chan []*Event
+	errorchan     chan error
 }
 
 func (e *Device) String() string {
@@ -108,49 +65,30 @@ func Open(devnode string) (*Device, error) {
 
 	dev.fd = f
 
-	ierr := ioctl(uintptr(dev.fd), C.EVIOCGVERSION, unsafe.Pointer(&dev.DriverVersion))
+	if dev.DriverVersion, err = IoctlInputVersion(dev.fd); err != nil {
 
-	if ierr != 0 {
 		dev.DriverVersion = 0
 		defer syscall.Close(dev.fd)
 		return nil, ErrDriverVersion
-
 	}
 
-	ids := new([4]uint16)
-
-	ierr = ioctl(uintptr(dev.fd), C.EVIOCGID, unsafe.Pointer(ids))
-
-	if ierr != 0 {
+	if dev.bus, dev.VendorID, dev.ProductID, dev.Version, err = IoctlInputID(dev.fd); err != nil {
 		defer syscall.Close(dev.fd)
 		return nil, ErrDeviceInformation
 	}
 
-	dev.ProductID = ids[C.ID_PRODUCT]
-	dev.VendorID = ids[C.ID_VENDOR]
-	dev.bus = ids[C.ID_BUS]
-	dev.Version = ids[C.ID_VERSION]
 	dev.eventchan = make(chan []*Event, 1)
+	dev.errorchan = make(chan error)
 
-	ptrname := C.malloc(C.sizeof_char * 256)
+	dev.Name, _ = IoctlInputName(dev.fd)
+	dev.Phy, _ = IoctlInputPhys(dev.fd)
 
-	defer C.free(unsafe.Pointer(ptrname))
+	var evbits []byte
 
-	C.getdevicename(C.int(dev.fd), 256, (*C.char)(ptrname))
-	dev.Name = C.GoString((*C.char)(ptrname))
-
-	ptrphy := C.malloc(C.sizeof_char * 256)
-
-	defer C.free(unsafe.Pointer(ptrphy))
-
-	C.getphy(C.int(dev.fd), 256, (*C.char)(ptrphy))
-	dev.Phy = C.GoString((*C.char)(ptrphy))
-
-	evbits := new([(EV_MAX + 1) / 8]byte)
-
-	if errevbits := C.geteviocbits(C.int(dev.fd), 0, EV_MAX, unsafe.Pointer(evbits)); errevbits < 0 {
+	if evbits, err = IoctlInputBit(dev.fd, 0, EV_MAX); err != nil {
 		defer syscall.Close(dev.fd)
 		return nil, ErrEvBits
+
 	}
 
 	dev.Capabilities = make(map[int]map[int]string)
@@ -158,10 +96,14 @@ func Open(devnode string) (*Device, error) {
 
 	for evtype := 0; evtype < EV_MAX; evtype++ {
 		if evbits[evtype/8]&(1<<uint(evtype%8)) != 0 {
+
 			dev.Capabilities[evtype] = make(map[int]string)
+
 			if evtype == EV_KEY {
-				codebits := new([(KEY_MAX + 1) / 8]byte)
-				if errevbits := C.geteviocbits(C.int(dev.fd), C.int(evtype), KEY_MAX, unsafe.Pointer(codebits)); errevbits >= 0 {
+
+				var codebits []byte
+
+				if codebits, err = IoctlInputBit(dev.fd, evtype, KEY_MAX); err == nil {
 
 					for evcode := 0; evcode < KEY_MAX; evcode++ {
 						if codebits[evcode/8]&(1<<uint(evcode%8)) != 0 {
@@ -176,9 +118,8 @@ func Open(devnode string) (*Device, error) {
 
 			if evtype == EV_ABS {
 
-				absbits := new([(ABS_MAX + 1) / 8]byte)
-
-				if errevbits := C.geteviocbits(C.int(dev.fd), C.int(evtype), KEY_MAX, unsafe.Pointer(absbits)); errevbits >= 0 {
+				var absbits []byte
+				if absbits, err = IoctlInputBit(dev.fd, evtype, ABS_MAX); err == nil {
 
 					for abscode := 0; abscode < ABS_MAX; abscode++ {
 						if absbits[abscode/8]&(1<<uint(abscode%8)) != 0 {
@@ -187,13 +128,15 @@ func Open(devnode string) (*Device, error) {
 
 							//hat not have absinfo
 							if abscode < ABS_HAT0X || abscode > ABS_HAT3Y {
-								absinfobits := new([24]byte)
 
-								if err := C.geteviocgabs(C.int(dev.fd), C.int(abscode), unsafe.Pointer(absinfobits)); err >= 0 {
+								var absinfobits []byte
+
+								if absinfobits, err = IoctlInputAbs(dev.fd, abscode); err == nil {
 									var a AbsInfo
 
 									a.Unpack(absinfobits[:])
 									dev.Absinfos[abscode] = a
+
 								}
 
 							}
@@ -212,6 +155,11 @@ func Open(devnode string) (*Device, error) {
 	return &dev, nil
 }
 
+func (dev *Device) Error() <-chan error {
+
+	return dev.errorchan
+}
+
 func (dev *Device) Read() chan []*Event {
 
 	go func() {
@@ -225,6 +173,8 @@ func (dev *Device) Read() chan []*Event {
 
 			} else {
 
+				dev.errorchan <- err
+
 				return
 			}
 
@@ -234,15 +184,8 @@ func (dev *Device) Read() chan []*Event {
 	return dev.eventchan
 }
 
-func (dev *Device) Grab(state bool) {
-	if state {
-		unix.IoctlSetInt(dev.fd, C.EVIOCGRAB, 1)
-
-	} else {
-		unix.IoctlSetInt(dev.fd, C.EVIOCGRAB, 0)
-
-	}
-
+func (dev *Device) Grab(state bool) error {
+	return IoctlInputGrab(dev.fd, state)
 }
 
 func (dev *Device) StopRead() {
@@ -261,29 +204,34 @@ func (dev *Device) Close() error {
 }
 
 func (dev *Device) KeysState() ([]byte, error) {
-	var sizekeybits int = (KEY_MAX + 1) / 8
 
-	keybits := new([(KEY_MAX + 1) / 8]byte)
+	var keybits []byte
+	var err error
 
-	if errkeybits := C.geteviocgkey(C.int(dev.fd), C.int(sizekeybits), unsafe.Pointer(keybits)); errkeybits < 0 {
-
-		return nil, ErrEvBits
+	if keybits, err = IoctlInputKey(dev.fd); err == nil {
+		return keybits, nil
 	}
-	return keybits[:], nil
+
+	return nil, ErrEvBits
+
 }
 
 func (dev *Device) AbsState(abscode int) (AbsInfo, error) {
 	var a AbsInfo
 
-	absbits := new([(ABS_MAX + 1) / 8]byte)
+	var absinfobits []byte
+	var err error
 
-	if errabsbits := C.geteviocgabs(C.int(dev.fd), C.int(abscode), unsafe.Pointer(absbits)); errabsbits < 0 {
+	if absinfobits, err = IoctlInputAbs(dev.fd, abscode); err == nil {
+		var a AbsInfo
 
-		return a, ErrAbsBits
+		a.Unpack(absinfobits[:])
+		dev.Absinfos[abscode] = a
+		return a, nil
 	}
 
-	a.Unpack(absbits[:])
-	return a, nil
+	return a, ErrAbsBits
+
 }
 
 func (dev *Device) Sync() error {

@@ -17,7 +17,7 @@ func main() {
 	for index, device := range inputs {
 
 		if dev, err := inputeventsubsystem.Open(device); err == nil {
-			fmt.Printf("[%d] %s %s\n", index, device, dev.Name)
+			fmt.Printf("[%d] %s %s VendorID:%x ProductID:%x\n", index, device, dev.Name, dev.VendorID, dev.ProductID)
 			defer dev.Close()
 		}
 
@@ -46,6 +46,9 @@ func main() {
 					}
 
 					device.ReadDone(events)
+				case err := <-device.Error():
+					fmt.Printf("Error: %s\n", err.Error())
+					return
 				case <-c:
 					fmt.Printf("Stopped\n")
 					break loopevents
