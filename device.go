@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"syscall"
+	"time"
 )
 
 type AbsInfo struct {
@@ -173,8 +174,10 @@ func (dev *Device) Read() chan []*Event {
 
 			} else {
 
-				dev.errorchan <- err
-
+				select {
+				case dev.errorchan <- err:
+				case <-time.After(time.Duration(100) * time.Millisecond):
+				}
 				return
 			}
 
