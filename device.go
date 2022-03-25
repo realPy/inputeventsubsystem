@@ -7,6 +7,8 @@ import (
 	"os"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 /*
@@ -230,6 +232,17 @@ func (dev *Device) Read() chan []*Event {
 
 	}()
 	return dev.eventchan
+}
+
+func (dev *Device) Grab(state bool) {
+	if state {
+		unix.IoctlSetInt(dev.fd, C.EVIOCGRAB, 1)
+
+	} else {
+		unix.IoctlSetInt(dev.fd, C.EVIOCGRAB, 0)
+
+	}
+
 }
 
 func (dev *Device) StopRead() {

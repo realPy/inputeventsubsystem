@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
-	"inputeventsubsystem"
+
 	"os"
 	"os/signal"
+
+	"github.com/realPy/inputeventsubsystem"
 )
 
 func main() {
@@ -27,6 +29,7 @@ func main() {
 	if choiceindex >= 0 && choiceindex < len(inputs) {
 		if device, err := inputeventsubsystem.Open(inputs[choiceindex]); err == nil {
 			defer device.Close()
+			device.Grab(true)
 
 			fmt.Printf("You have open %s\n", device)
 			c := make(chan os.Signal, 1)
