@@ -110,10 +110,10 @@ func IoctlInputGrab(fd int, acquire bool) error {
 
 func IoctlInputBit(fd int, min, max int) ([]byte, error) {
 
-	var databits []byte = make([]byte, (max+1)/8)
+	var databits []byte = make([]byte, (max/8)+1)
 
 	var err error
-	if errno := ioctl(uintptr(fd), uintptr(C.eviocgbit(C.int(min), C.int(max))), unsafe.Pointer(&databits[0])); errno != 0 {
+	if errno := ioctl(uintptr(fd), uintptr(C.eviocgbit(C.int(min), C.int(len(databits)))), unsafe.Pointer(&databits[0])); errno != 0 {
 		err = errno
 	}
 	return databits, err
