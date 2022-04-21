@@ -53,7 +53,7 @@ func (e *Device) String() string {
 }
 
 // Open an evdev input device.
-func Open(devnode string) (*Device, error) {
+func Open(devnode string, buffersize int) (*Device, error) {
 
 	var dev Device
 	dev.Fn = devnode
@@ -78,7 +78,7 @@ func Open(devnode string) (*Device, error) {
 		return nil, ErrDeviceInformation
 	}
 
-	dev.eventchan = make(chan []*Event, 1)
+	dev.eventchan = make(chan []*Event, buffersize)
 	dev.errorchan = make(chan error)
 
 	dev.Name, _ = IoctlInputName(dev.fd)

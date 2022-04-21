@@ -16,7 +16,7 @@ func main() {
 	fmt.Println("Available devices:")
 	for index, device := range inputs {
 
-		if dev, err := inputeventsubsystem.Open(device); err == nil {
+		if dev, err := inputeventsubsystem.Open(device, 1); err == nil {
 			fmt.Printf("[%d] %s %s VendorID:%x ProductID:%x\n", index, device, dev.Name, dev.VendorID, dev.ProductID)
 			defer dev.Close()
 		}
@@ -27,7 +27,7 @@ func main() {
 	fmt.Scanf("%d", &choiceindex)
 
 	if choiceindex >= 0 && choiceindex < len(inputs) {
-		if device, err := inputeventsubsystem.Open(inputs[choiceindex]); err == nil {
+		if device, err := inputeventsubsystem.Open(inputs[choiceindex], 1); err == nil {
 			defer device.Close()
 			device.Grab(true)
 
