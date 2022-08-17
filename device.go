@@ -5,8 +5,11 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 type AbsInfo struct {
@@ -46,6 +49,7 @@ type Device struct {
 	Absinfos      map[int]AbsInfo
 	eventchan     chan []*Event
 	errorchan     chan error
+	stopped       int32
 }
 
 func (e *Device) String() string {
@@ -58,7 +62,8 @@ func Open(devnode string, buffersize int) (*Device, error) {
 	var dev Device
 	dev.Fn = devnode
 
-	f, err := syscall.Open(dev.Fn, syscall.O_RDONLY, 0666)
+	f, err := unix.Open(dev.Fn, syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0666)
+	//f, err := syscall.Open(dev.Fn, syscall.O_NONBLOCK, 0666)
 
 	if err != nil {
 		return nil, err
@@ -168,16 +173,34 @@ func (dev *Device) Read() chan []*Event {
 
 		for {
 
-			if n, err := syscall.Read(dev.fd, events[:]); err == nil {
-				p := UnpackDeviceInputEvents(events[0:n])
-				dev.eventchan <- p
+			rFdSet := &unix.FdSet{}
+			fd := int(dev.fd)
+			rFdSet.Set(fd)
 
-			} else {
+			t := unix.Timespec{Sec: 1 /*sec*/, Nsec: 0 /*usec*/}
 
-				select {
-				case dev.errorchan <- err:
-				case <-time.After(time.Duration(100) * time.Millisecond):
+			if _, err := unix.Pselect(fd+1, rFdSet, nil, nil, &t, nil); err == nil {
+
+				if n, err := unix.Read(fd, events[:]); err == nil {
+					p := UnpackDeviceInputEvents(events[0:n])
+					dev.eventchan <- p
+
+				} else {
+
+					if err != syscall.EWOULDBLOCK {
+						select {
+						case dev.errorchan <- err:
+
+						case <-time.After(time.Duration(100) * time.Millisecond):
+						}
+						return
+					}
+
 				}
+
+			}
+
+			if atomic.LoadInt32(&dev.stopped) == 1 {
 				return
 			}
 
@@ -203,6 +226,7 @@ func (dev *Device) ReadDone(events []*Event) {
 }
 
 func (dev *Device) Close() error {
+	atomic.StoreInt32(&dev.stopped, 1)
 	return syscall.Close(dev.fd)
 }
 
