@@ -79,20 +79,30 @@ func (a *AxisDevice) CorrectAxis(which int, value int32) int32 {
 
 		value = value * 2
 
-		if value > a.axis_corrections[which].Coef[0] {
-			if value < a.axis_corrections[which].Coef[1] {
-				return 0
-			}
+		if array_correction, ok := a.axis_corrections[which]; !ok {
 
-			value = value - a.axis_corrections[which].Coef[1]
+			return value
 		} else {
-			value = value - a.axis_corrections[which].Coef[0]
+			if value > array_correction.Coef[0] {
+				if value < array_correction.Coef[1] {
+					return 0
+				}
+
+				value = value - array_correction.Coef[1]
+			} else {
+				value = value - array_correction.Coef[0]
+			}
+			value = value * array_correction.Coef[2]
+			value >>= 13
 		}
-		value = value * a.axis_corrections[which].Coef[2]
-		value >>= 13
 
 	} else {
-		value = int32(math.Floor(float64(float32(value-a.axis_corrections[which].Minimum)*a.axis_corrections[which].Scale - float32(32768) + 0.5)))
+		if array_correction, ok := a.axis_corrections[which]; !ok {
+
+			return value
+		} else {
+			value = int32(math.Floor(float64(float32(value-array_correction.Minimum)*array_correction.Scale - float32(32768) + 0.5)))
+		}
 	}
 
 	/* Clamp and return */
