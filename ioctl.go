@@ -41,6 +41,12 @@ return EVIOCGKEY(size);
 }
 
 
+static inline int eviockeycode()
+{
+return EVIOCGKEYCODE;
+}
+
+
 */
 import "C"
 
@@ -120,9 +126,7 @@ func IoctlInputBit(fd int, min, max int) ([]byte, error) {
 }
 
 func IoctlInputAbs(fd int, typeabs int) ([]byte, error) {
-
 	var absbits []byte = make([]byte, 24)
-
 	var err error
 	if errno := ioctl(uintptr(fd), uintptr(C.eviocgabs(C.int(typeabs))), unsafe.Pointer(&absbits[0])); errno != 0 {
 		err = errno
@@ -141,4 +145,16 @@ func IoctlInputKey(fd int) ([]byte, error) {
 		err = errno
 	}
 	return keybits, err
+}
+
+func IoctlGetScanCode(fd int, key uint16) (uint16, error) {
+
+	var scankeys []uint16 = make([]uint16, 4)
+
+	scankeys[0] = key
+	var err error
+	if errno := ioctl(uintptr(fd), C.EVIOCGKEYCODE, unsafe.Pointer(&scankeys[0])); errno != 0 {
+		err = errno
+	}
+	return scankeys[1], err
 }

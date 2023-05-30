@@ -63,7 +63,6 @@ func Open(devnode string, buffersize int) (*Device, error) {
 	dev.Fn = devnode
 
 	f, err := unix.Open(dev.Fn, syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0666)
-	//f, err := syscall.Open(dev.Fn, syscall.O_NONBLOCK, 0666)
 
 	if err != nil {
 		return nil, err
@@ -263,4 +262,8 @@ func (dev *Device) AbsState(abscode int) (AbsInfo, error) {
 
 func (dev *Device) Sync() error {
 	return syscall.Fsync(dev.fd)
+}
+
+func (dev *Device) GetScanCode(code uint16) (uint16, error) {
+	return IoctlGetScanCode(dev.fd, code)
 }
