@@ -77,12 +77,11 @@ func (a *AxisDevice) CorrectAxis(which int, value int32) int32 {
 
 	if a.useDeadZone {
 
-		value = value * 2
-
 		if array_correction, ok := a.axis_corrections[which]; !ok {
 
 			return value
 		} else {
+			value = value * 2
 			if value > array_correction.Coef[0] {
 				if value < array_correction.Coef[1] {
 					return 0
