@@ -56,14 +56,12 @@ func CreateAxisDeviceFromAbsInfo(e *Device, absinfos map[int]AbsInfo, useDeadZon
 			} else {
 				a.Coef[2] = 0
 			}
-		} else {
-
-			var value_range float64 = float64(absinfo.Maximum - absinfo.Minimum)
-			var output_range float64 = float64(32767 * 2)
-
-			a.Scale = float32(output_range / value_range)
-
 		}
+
+		var value_range float64 = float64(absinfo.Maximum - absinfo.Minimum)
+		var output_range float64 = float64(32767 * 2)
+
+		a.Scale = float32(output_range / value_range)
 
 		ad.axis_corrections[abs_code] = a
 
