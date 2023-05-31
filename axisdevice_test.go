@@ -39,13 +39,20 @@ func TestCorrectAxis(t *testing.T) {
 		a := CreateAxisDeviceFromAbsInfo(nil, map[int]AbsInfo{ABS_X: {Minimum: 0, Maximum: 0, Flat: 0}}, false, -1)
 
 		v := a.CorrectAxis(ABS_X, 100)
-		assert.Equal(t, int32(-32668), v)
+		assert.Equal(t, int32(99), v)
 	})
 
 	t.Run("0-255 range deadzone override 10 divide 255", func(t *testing.T) {
 		a := CreateAxisDeviceFromAbsInfo(nil, map[int]AbsInfo{ABS_X: {Minimum: 0, Maximum: 255, Flat: 0}}, true, 0)
 		v := a.CorrectAxis(ABS_X, 100)/255 + 127
 		assert.Equal(t, int32(100), v)
+	})
+
+	t.Run("0-255 range deadzone offs", func(t *testing.T) {
+		a := CreateAxisDeviceFromAbsInfo(nil, map[int]AbsInfo{ABS_X: {Minimum: 0, Maximum: 255, Flat: 0}}, false, 0)
+
+		v := a.CorrectAxis(ABS_X, 0)
+		assert.Equal(t, int32(-32767), v)
 	})
 
 }

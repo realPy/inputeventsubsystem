@@ -2,7 +2,6 @@ package inputeventsubsystem
 
 import (
 	"errors"
-	"math"
 )
 
 var (
@@ -13,7 +12,8 @@ type axis_correct struct {
 	Coef    []int32
 	Maximum int32
 	Minimum int32
-	Scale   float32
+	Median  int32
+	Scale   float64
 }
 
 type AxisDevice struct {
@@ -40,8 +40,7 @@ func CreateAxisDeviceFromAbsInfo(e *Device, absinfos map[int]AbsInfo, useDeadZon
 		}
 
 		if useDeadZone {
-			a.Maximum = absinfo.Maximum
-			a.Minimum = absinfo.Minimum
+
 			if overrideFlatValue >= 0 {
 				absinfo.Flat = int32(overrideFlatValue)
 			}
@@ -58,10 +57,14 @@ func CreateAxisDeviceFromAbsInfo(e *Device, absinfos map[int]AbsInfo, useDeadZon
 			}
 		}
 
-		var value_range float64 = float64(absinfo.Maximum - absinfo.Minimum)
-		var output_range float64 = float64(32767 * 2)
+		a.Maximum = absinfo.Maximum
+		a.Minimum = absinfo.Minimum
 
-		a.Scale = float32(output_range / value_range)
+		var value_range float64 = float64(absinfo.Maximum - absinfo.Minimum - 1)
+		var output_range float64 = float64(65534)
+
+		a.Scale = float64(output_range) / float64(value_range)
+		a.Median = int32(value_range) / 2
 
 		ad.axis_corrections[abs_code] = a
 
@@ -83,6 +86,13 @@ func (e *Device) AxisDevice(UseDeadZone bool, overrideFlatValue int) (*AxisDevic
 	}
 
 	return ad, err
+}
+
+func (a *AxisDevice) GetRange(which int) (int32, int32) {
+	if array_correction, ok := a.axis_corrections[which]; ok {
+		return array_correction.Minimum, array_correction.Maximum
+	}
+	return 0, 0
 }
 
 func (a *AxisDevice) CorrectAxisWithDeadzone(which int, value int32, deadzone bool) int32 {
@@ -112,7 +122,10 @@ func (a *AxisDevice) CorrectAxisWithDeadzone(which int, value int32, deadzone bo
 
 			return value
 		} else {
-			value = int32(math.Floor(float64(float32(value-array_correction.Minimum)*array_correction.Scale - float32(32768) + 0.5)))
+			offset_scale := (value - array_correction.Minimum)
+
+			value = int32(float64(offset_scale-array_correction.Median) * array_correction.Scale)
+
 		}
 	}
 
