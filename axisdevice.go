@@ -127,6 +127,13 @@ func (a *AxisDevice) CorrectAxisWithDeadzone(which int, value int32, deadzone bo
 
 }
 
+func (a *AxisDevice) GetRange(which int) (int32, int32) {
+	if array_correction, ok := a.axis_corrections[which]; !ok {
+		return array_correction.Minimum, array_correction.Maximum
+	}
+	return 0, 0
+}
+
 func (a *AxisDevice) CorrectAxis(which int, value int32) int32 {
 
 	return a.CorrectAxisWithDeadzone(which, value, true)
