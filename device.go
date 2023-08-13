@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/unix"
 )
@@ -62,7 +63,7 @@ func Open(devnode string, buffersize int) (*Device, error) {
 	var dev Device
 	dev.Fn = devnode
 
-	f, err := unix.Open(dev.Fn, syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0666)
+	f, err := unix.Open(dev.Fn, syscall.O_CLOEXEC|syscall.O_NONBLOCK|syscall.O_RDWR, 0666)
 
 	if err != nil {
 		return nil, err
@@ -258,6 +259,17 @@ func (dev *Device) AbsState(abscode int) (AbsInfo, error) {
 
 	return a, ErrAbsBits
 
+}
+func (dev *Device) IoCtl(name uintptr, data unsafe.Pointer) error {
+	var err error
+	if errno := ioctl(uintptr(dev.fd), name, data); errno != 0 {
+		err = errno
+	}
+	return err
+}
+
+func (dev *Device) Write(data []byte) (int, error) {
+	return unix.Write(dev.fd, data)
 }
 
 func (dev *Device) Sync() error {
