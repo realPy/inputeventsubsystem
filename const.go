@@ -1203,6 +1203,7 @@ const (
 	BTN_TRIGGER_HAPPY40          = 0x2e7
 	KEY_MIN_INTERESTING          = KEY_MUTE
 	KEY_MAX                      = 0x2ff
+	LED_MAX                      = 0xf
 	KEY_WHEEL_UP                 = 0x300
 	KEY_WHEEL_DOWN               = 0x301
 	SYN_REPORT                   = 0

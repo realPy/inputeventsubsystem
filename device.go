@@ -243,6 +243,19 @@ func (dev *Device) KeysState() ([]byte, error) {
 
 }
 
+func (dev *Device) LesdsState() ([]byte, error) {
+
+	var ledsbits []byte
+	var err error
+
+	if ledsbits, err = IoctlLeds(dev.fd); err == nil {
+		return ledsbits, nil
+	}
+
+	return nil, ErrEvBits
+
+}
+
 func (dev *Device) AbsState(abscode int) (AbsInfo, error) {
 	var a AbsInfo
 

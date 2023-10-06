@@ -46,6 +46,11 @@ static inline int eviockeycode()
 return EVIOCGKEYCODE;
 }
 
+static inline int eviocled(int size)
+{
+return EVIOCGLED(size);
+}
+
 
 */
 import "C"
@@ -145,6 +150,19 @@ func IoctlInputKey(fd int) ([]byte, error) {
 		err = errno
 	}
 	return keybits, err
+}
+
+func IoctlLeds(fd int) ([]byte, error) {
+
+	var sizelledbits int = (LED_MAX + 1) / 8
+
+	var ledbits []byte = make([]byte, sizelledbits)
+
+	var err error
+	if errno := ioctl(uintptr(fd), uintptr(C.eviocled(C.int(sizelledbits))), unsafe.Pointer(&ledbits[0])); errno != 0 {
+		err = errno
+	}
+	return ledbits, err
 }
 
 func IoctlGetScanCode(fd int, key uint16) (uint16, error) {
