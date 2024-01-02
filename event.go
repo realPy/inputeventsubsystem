@@ -67,7 +67,6 @@ func UnpackDeviceInputEvents(data []byte) []*Event {
 	var i int = 0
 
 	for {
-
 		ev := eventPool.Get().(*Event)
 
 		ev.Time.Sec = timeval(binary.LittleEndian.Uint32(data[i*deviceinputeventsize : i*deviceinputeventsize+4]))
@@ -85,4 +84,9 @@ func UnpackDeviceInputEvents(data []byte) []*Event {
 		i++
 	}
 	return events
+}
+
+func UnsafeUnpackDeviceInputEvents(data []byte) []Event {
+	ev := (*[]Event)(unsafe.Pointer(&data))
+	return (*ev)[:len(data)/deviceinputeventsize]
 }

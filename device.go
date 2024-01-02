@@ -36,21 +36,22 @@ func (a *AbsInfo) Unpack(data []byte) {
 }
 
 type Device struct {
-	Fn            string   // path to input device (devnode)
-	File          *os.File // an open file handle to the input device
-	fd            int
-	DriverVersion uint32
-	bus           uint16
-	VendorID      uint16
-	ProductID     uint16
-	Version       uint16
-	Name          string
-	Phy           string
-	Capabilities  map[int]map[int]string
-	Absinfos      map[int]AbsInfo
-	eventchan     chan []*Event
-	errorchan     chan error
-	stopped       int32
+	Fn              string   // path to input device (devnode)
+	File            *os.File // an open file handle to the input device
+	fd              int
+	DriverVersion   uint32
+	bus             uint16
+	VendorID        uint16
+	ProductID       uint16
+	Version         uint16
+	Name            string
+	Phy             string
+	Capabilities    map[int]map[int]string
+	Absinfos        map[int]AbsInfo
+	eventchan       chan []*Event
+	unsafeeventchan chan []Event
+	errorchan       chan error
+	stopped         int32
 }
 
 func (e *Device) String() string {
@@ -84,6 +85,7 @@ func Open(devnode string, buffersize int) (*Device, error) {
 	}
 
 	dev.eventchan = make(chan []*Event, buffersize)
+	dev.unsafeeventchan = make(chan []Event, buffersize)
 	dev.errorchan = make(chan error)
 
 	dev.Name, _ = IoctlInputName(dev.fd)
@@ -164,6 +166,50 @@ func Open(devnode string, buffersize int) (*Device, error) {
 func (dev *Device) Error() <-chan error {
 
 	return dev.errorchan
+}
+
+func (dev *Device) UnsafeRead() chan []Event {
+
+	go func() {
+		var events [deviceinputeventsize * 64]byte
+
+		for {
+
+			rFdSet := &unix.FdSet{}
+			fd := int(dev.fd)
+			rFdSet.Set(fd)
+
+			t := unix.Timespec{Sec: 1 /*sec*/, Nsec: 0 /*usec*/}
+
+			if _, err := unix.Pselect(fd+1, rFdSet, nil, nil, &t, nil); err == nil {
+
+				if n, err := unix.Read(fd, events[:]); err == nil {
+					p := UnsafeUnpackDeviceInputEvents(events[0:n])
+					dev.unsafeeventchan <- p
+
+				} else {
+
+					if err != syscall.EWOULDBLOCK {
+						select {
+						case dev.errorchan <- err:
+
+						case <-time.After(time.Duration(100) * time.Millisecond):
+						}
+						return
+					}
+
+				}
+
+			}
+
+			if atomic.LoadInt32(&dev.stopped) == 1 {
+				return
+			}
+
+		}
+
+	}()
+	return dev.unsafeeventchan
 }
 
 func (dev *Device) Read() chan []*Event {
