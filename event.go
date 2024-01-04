@@ -15,6 +15,10 @@ var eventPool = sync.Pool{
 	New: func() interface{} { return new(Event) },
 }
 
+var eventPoolUnsafe = sync.Pool{
+	New: func() interface{} { return new([deviceinputeventsize * 64]byte) },
+}
+
 type Event struct {
 	Time  syscall.Timeval // time in seconds since epoch at which event occurred
 	Type  uint16          // event code related to the event type
@@ -72,6 +76,10 @@ func UnpackDeviceInputEvents(data []byte) []*Event {
 		ev.Time.Sec = timeval(binary.LittleEndian.Uint32(data[i*deviceinputeventsize : i*deviceinputeventsize+4]))
 		ev.Time.Usec = timeval(binary.LittleEndian.Uint32(data[i*deviceinputeventsize+sizetimeval-sizetimeval/2 : i*deviceinputeventsize+sizetimeval]))
 
+		/*
+			ev.Time.Sec = int64(binary.LittleEndian.Uint64(data[i*deviceinputeventsize : i*deviceinputeventsize+8]))
+			ev.Time.Usec = int64(binary.LittleEndian.Uint64(data[i*deviceinputeventsize+sizetimeval-sizetimeval/2 : i*deviceinputeventsize+sizetimeval]))
+		*/
 		ev.Type = binary.LittleEndian.Uint16(data[i*deviceinputeventsize+sizetimeval : i*deviceinputeventsize+sizetimeval+2])
 		ev.Code = binary.LittleEndian.Uint16(data[i*deviceinputeventsize+sizetimeval+2 : i*deviceinputeventsize+sizetimeval+4])
 		ev.Value = int32(binary.LittleEndian.Uint32(data[i*deviceinputeventsize+sizetimeval+4 : i*deviceinputeventsize+sizetimeval+8]))

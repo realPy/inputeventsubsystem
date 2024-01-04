@@ -171,8 +171,8 @@ func (dev *Device) Error() <-chan error {
 func (dev *Device) UnsafeRead() chan []Event {
 
 	go func() {
-		var events [deviceinputeventsize * 64]byte
-
+		//var events [deviceinputeventsize * 64]byte
+		events := eventPoolUnsafe.Get().(*[deviceinputeventsize * 64]byte)
 		for {
 
 			rFdSet := &unix.FdSet{}
@@ -269,6 +269,11 @@ func (dev *Device) ReadDone(events []*Event) {
 	for _, ev := range events {
 		eventPool.Put(ev)
 	}
+}
+
+func (dev *Device) UnsafeReadDone(events []Event) {
+
+	eventPoolUnsafe.Put(*(*[deviceinputeventsize * 64]byte)(unsafe.Pointer(&events)))
 }
 
 func (dev *Device) Close() error {
