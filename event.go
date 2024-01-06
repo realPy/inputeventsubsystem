@@ -16,7 +16,9 @@ var eventPool = sync.Pool{
 }
 
 var eventPoolUnsafe = sync.Pool{
-	New: func() interface{} { return new([deviceinputeventsize * 64]byte) },
+	New: func() interface{} {
+		return new([deviceinputeventsize * 64]byte)
+	},
 }
 
 type Event struct {

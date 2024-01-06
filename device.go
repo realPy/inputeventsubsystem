@@ -186,6 +186,7 @@ func (dev *Device) UnsafeRead() chan []Event {
 				if n, err := unix.Read(fd, events[:]); err == nil {
 					p := UnsafeUnpackDeviceInputEvents(events[0:n])
 					dev.unsafeeventchan <- p
+					events = eventPoolUnsafe.Get().(*[deviceinputeventsize * 64]byte)
 
 				} else {
 
@@ -272,8 +273,7 @@ func (dev *Device) ReadDone(events []*Event) {
 }
 
 func (dev *Device) UnsafeReadDone(events []Event) {
-
-	eventPoolUnsafe.Put(*(*[deviceinputeventsize * 64]byte)(unsafe.Pointer(&events)))
+	eventPoolUnsafe.Put((*[deviceinputeventsize * 64]byte)(unsafe.Pointer(&events[0])))
 }
 
 func (dev *Device) Close() error {
