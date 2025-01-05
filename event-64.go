@@ -3,7 +3,8 @@
 
 package inputeventsubsystem
 
-func timeval(value uint32) int64 {
+import "encoding/binary"
 
-	return int64(value)
+func GetTimevalValue(data []byte) int64 {
+	return int64(binary.LittleEndian.Uint64(data))
 }

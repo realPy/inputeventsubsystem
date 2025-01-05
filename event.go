@@ -75,13 +75,9 @@ func UnpackDeviceInputEvents(data []byte) []*Event {
 	for {
 		ev := eventPool.Get().(*Event)
 
-		ev.Time.Sec = timeval(binary.LittleEndian.Uint32(data[i*deviceinputeventsize : i*deviceinputeventsize+4]))
-		ev.Time.Usec = timeval(binary.LittleEndian.Uint32(data[i*deviceinputeventsize+sizetimeval-sizetimeval/2 : i*deviceinputeventsize+sizetimeval]))
+		ev.Time.Sec = GetTimevalValue(data[i*deviceinputeventsize:])
+		ev.Time.Usec = GetTimevalValue(data[i*deviceinputeventsize+sizetimeval/2:])
 
-		/*
-			ev.Time.Sec = int64(binary.LittleEndian.Uint64(data[i*deviceinputeventsize : i*deviceinputeventsize+8]))
-			ev.Time.Usec = int64(binary.LittleEndian.Uint64(data[i*deviceinputeventsize+sizetimeval-sizetimeval/2 : i*deviceinputeventsize+sizetimeval]))
-		*/
 		ev.Type = binary.LittleEndian.Uint16(data[i*deviceinputeventsize+sizetimeval : i*deviceinputeventsize+sizetimeval+2])
 		ev.Code = binary.LittleEndian.Uint16(data[i*deviceinputeventsize+sizetimeval+2 : i*deviceinputeventsize+sizetimeval+4])
 		ev.Value = int32(binary.LittleEndian.Uint32(data[i*deviceinputeventsize+sizetimeval+4 : i*deviceinputeventsize+sizetimeval+8]))
